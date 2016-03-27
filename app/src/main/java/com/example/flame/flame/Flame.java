@@ -14,7 +14,7 @@ public class Flame {
     
     private boolean isPress;
     
-    private float flameWidth = 10f;
+    private float flameWidth = 20f;
     
     private float speed;
     
@@ -47,11 +47,13 @@ public class Flame {
     }
     
     public void setRope(Rope rope) {
+
         this.rope = rope;
-        this.positionBottomX = rope.getPositionTopX();
+        this.positionBottomX = rope.getPositionTopX() + this.flameWidth /2;
         this.positionBottomY = 1000;
-        this.positionTopX = this.positionBottomX;
-        this.positionTopY = this.positionBottomY + this.flameHeight;
+        this.positionTopX = this.positionBottomX - this.flameWidth;
+        this.positionTopY = this.positionBottomY - this.flameHeight;
+
     }
 
     private void setFlameHeight(float height) {
@@ -71,7 +73,6 @@ public class Flame {
 
     }
     public void setAltitude(Altitude altitude) {
-
         this.altitude = altitude;
     }
 
@@ -81,14 +82,12 @@ public class Flame {
     }
 
     public Gas getGas() {
-
         return this.gas;
     }
 
     public void setPositionTop(float x, float y) {
         this.positionTopX = x;
         this.positionTopY = y;
-
     }
     public void setPositionBottom(float x, float y) {
         this.positionBottomX = x;

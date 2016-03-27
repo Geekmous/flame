@@ -39,12 +39,15 @@ public class Rope {
     
     private void setSpeedPercentage() {                                       //设置速度影响档
         int temp = this.size - Rope.NORLMAL_SIZE;
+
         if (temp > 0) {
             speedPercentage = Rope.BASEDROPESPEED * (1 + temp * 0.25f);     //1.25倍正常速度
         }
+
         else if(temp < 0){
             this.speedPercentage = Rope.BASEDROPESPEED  * (1 - temp * 0.25f); //0.75倍正常速度
         }
+
         else this.speedPercentage = (float)Rope.NORLMAL_SIZE;                   //正常速度
     }
     

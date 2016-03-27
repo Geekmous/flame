@@ -39,7 +39,10 @@ public class MainActivity extends ActionBarActivity {
     Gas gas = new Gas();
     //高度记录
     Altitude altitude =new Altitude();
-
+    boolean moveLeft = false;
+    boolean moveRight = false;
+    float moveSpeedX = 20;
+    float movePx = 0;
     Matrix matrix = new Matrix();
     float degress = 0f;
     @Override
@@ -59,7 +62,8 @@ public class MainActivity extends ActionBarActivity {
 
         tableWidth = metrics.widthPixels;
         tableHeight = metrics.heightPixels;
-        initRope.setPostionTop(tableWidth / 2, tableHeight * 3 / 4);
+
+        initRope.setPostionTop(tableWidth / 2, 0f);
 
         ropes.add(initRope);
         ropeMaxNumber = (int) tableWidth / (int) Flame.BASEDFLAMEHIGHT;
@@ -67,11 +71,7 @@ public class MainActivity extends ActionBarActivity {
         flame.setRope(initRope);
         flame.setAltitude(altitude);
         initRope.setHeight(flame.getFlameHeight());
-        
-        StatusView statusView = new StatusView(this);
-        statusView.setMinimumWidth(480);
-        statusView.setMinimumHeight(50);
-        setContentView(statusView);
+
         final GameView gameView = new GameView(this);
 
         setContentView(gameView);
@@ -96,14 +96,11 @@ public class MainActivity extends ActionBarActivity {
                         break;
                     case MotionEvent.ACTION_MOVE:
                          float changeX = x - preX;
-                        if(flame.getPositionTopX() + changeX < flame.getPositionBottomX() + flame.getFlameHeight() && flame.getPositionTopX() + changeX > flame.getPositionBottomX() - flame.getFlameHeight()) {
-                            flame.setPositionTop(flame.getPositionTopX() + changeX,(float)(flame.getPositionBottomY() + Math.sqrt(flame.getFlameHeight() * flame.getFlameHeight() - (flame.getPositionTopX() - flame.getPositionBottomX()) * (flame.getPositionTopX() - flame.getPositionBottomX()))));
-                        }
-                        else {
-                            if(changeX > 0) {
-                                flame.setPositionTop(flame.getPositionBottomX() + flame.getFlameHeight(), flame.getPositionBottomY());
-                            }
-                            else flame.setPositionTop(flame.getPositionBottomX() - flame.getFlameHeight(), flame.getPositionBottomY());
+                         if(changeX > 100 ) {
+                            moveRight = true;
+                         }
+                        if(changeX < - 100) {
+                            moveLeft = true;
                         }
 
                         break;
@@ -121,14 +118,45 @@ public class MainActivity extends ActionBarActivity {
         final Timer timer = new Timer();
 
         timer.schedule(new TimerTask() {
+
             public void run() {
+
                 for(int i = 0; i < ropes.size(); i++) {
+
                     Rope rope = ropes.get(i);
+
                     rope.setPostionTop(rope.getPositionTopX(), rope.getPositionTopY() + flame.getSpeed());
                     if(rope.getPositionTopY() > tableHeight) {
                         ropes.remove(i);
                     }
                 }
+                if( moveLeft == true ) {
+
+                    for(int i = 0; i < ropes.size(); i++) {
+                        Rope rope = ropes.get(i);
+                        if(flame.getPositionTopX() - moveSpeedX < rope.getPositionTopX()) {
+                            flame.setRope(rope);
+                            moveLeft = false;
+                            movePx = 0f;
+                        }
+                    }
+
+                    //现在还没有绳子可以依附,并且位移还没有足够到达火焰高度
+                    if( moveLeft == true ) {
+
+                        flame.setPositionTop(flame.getPositionTopX() - moveSpeedX, flame.getPositionTopY());
+                        flame.setPositionBottom(flame.getPositionBottomX() - moveSpeedX, flame.getPositionBottomY());
+                        movePx += moveSpeedX;
+
+                    }
+
+                }
+
+                if( moveRight == true ) {
+                    flame.setPositionTop(flame.getPositionTopX() + moveSpeedX, flame.getPositionTopY());
+                    flame.setPositionBottom(flame.getPositionBottomX() + moveSpeedX, flame.getPositionBottomY());
+                }
+
 
                 //发送消息，通知系统重绘组件
                 handler.sendEmptyMessage(0x123);
@@ -148,9 +176,6 @@ public class MainActivity extends ActionBarActivity {
         public GameView(Context context) {
             super(context);
             setFocusable(true);
-
-
-
         }
 
         //重写View的onDraw方法，实现绘画
@@ -181,6 +206,7 @@ public class MainActivity extends ActionBarActivity {
                 canvas.drawText("游戏已结束", 50, 200, paint);
 
             }
+
             //如果游戏还未结束
             else {
                 //
@@ -198,10 +224,9 @@ public class MainActivity extends ActionBarActivity {
                     canvas.drawCircle(rope.getPositionTopX(), rope.getPositionTopY() + rope.getLength(), 2f,paint);
                     canvas.drawLine(rope.getPositionTopX(),rope.getPositionTopY(),rope.getPositionTopX(),rope.getPositionTopY() + rope.getLength(), paint);
                 }
-
                 paint.setColor(Color.rgb(80, 80, 200));
                 paint.setStrokeWidth(1);
-                cacheCanvas.drawRect(flame.getPositionTopX(), flame.getPositionTopY(), flame.getPositionBottomX(), flame.getPositionBottomY(), paint);
+                cacheCanvas.drawRect(flame.getPositionTopX(), flame.getPositionTopY(), flame.getPositionBottomX() + flame.getFlameWidth(), flame.getPositionBottomY(), paint);
                 canvas.drawRect(flame.getPositionTopX(), flame.getPositionTopY(), flame.getPositionBottomX(), flame.getPositionBottomY(), paint);
 
             }
@@ -209,7 +234,7 @@ public class MainActivity extends ActionBarActivity {
     }
 
 
-    class StatusView extends View {
+   /* class StatusView extends View {
         Paint paint;
         StatusView(Context context) {
             super(context);
@@ -223,5 +248,5 @@ public class MainActivity extends ActionBarActivity {
             canvas.drawRect(0, 0, gas.getCurrentGas(), 30, paint);
             canvas.drawText("高度："+altitude.getAltitude(),200, 30,200,30,paint);
         }
-    }
+    } */
 }
