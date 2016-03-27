@@ -1,8 +1,10 @@
 package com.example.flame.flame;
 
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.os.Handler;
 import android.os.Message;
@@ -10,56 +12,44 @@ import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
 import android.util.DisplayMetrics;
 import android.view.Display;
-import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
-import android.widget.LinearLayout;
-import android.widget.RelativeLayout;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
 
 public class MainActivity extends ActionBarActivity {
-    //桌面的宽度
-    private int tableWidth;
-    //桌面的高度
-    private int tableHeight;
-    //球拍的垂直位置
-    private int racketY;
-    //下面定义球拍的高度和宽度
-    private final int RACKET_HEIGHT = 20;
-    private final int RACKET_WIDTH = 70;
-    //小球的大小
-    private final int BALL_SIZE = 12;
-    //小球纵向的运行速度
-    private int ySpeed = 10;
-    Random rand = new Random();
-    //返回一个-0.5`0.5的比率，用于控制小球的运行方向
-    private double xyRate = rand.nextDouble() - 0.5;
-    //小球纵向的运行速度
-    private int xSpeed = (int) (ySpeed * xyRate * 2);
-    // ballX和ballY代表小球的坐标
-    private int ballX = rand.nextInt(200) + 20;
-    private int ballY = rand.nextInt(10) +20;
-    //racketX代表球拍的水平位置
-    private int racketX = rand.nextInt(200);
-    //游戏是否结束的旗标
+    private float tableWidth,tableHeight;
+    private float preX,preY;
+    //游戏是否结束
     private boolean isLose = false;
-    float preX,preY;
+
+    Rope initRope = new Rope();
+    //出现在屏幕上的绳子
+    List<Rope> ropes = new ArrayList<Rope>();
+
+    Flame flame ;
+    int ropeMaxNumber;
+    //瓦斯记录
+    Gas gas = new Gas();
+    //高度记录
+    Altitude altitude =new Altitude();
+
+    Matrix matrix = new Matrix();
+    float degress = 0f;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
         //去掉窗口标题
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         //全屏显示
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
         //创建GameView组件
-        final GameView gameView = new GameView(this);
-        setContentView(gameView);
         //获取窗口管理器
         WindowManager windowManager = getWindowManager();
         Display display = windowManager.getDefaultDisplay();
@@ -68,10 +58,23 @@ public class MainActivity extends ActionBarActivity {
         //获得屏幕宽和高
 
         tableWidth = metrics.widthPixels;
-
         tableHeight = metrics.heightPixels;
+        initRope.setPostionTop(tableWidth / 2, tableHeight * 3 / 4);
 
-        racketY = tableHeight - 80;
+        ropes.add(initRope);
+        ropeMaxNumber = (int) tableWidth / (int) Flame.BASEDFLAMEHIGHT;
+        flame = new Flame();
+        flame.setRope(initRope);
+        flame.setAltitude(altitude);
+        initRope.setHeight(flame.getFlameHeight());
+        
+        StatusView statusView = new StatusView(this);
+        statusView.setMinimumWidth(480);
+        statusView.setMinimumHeight(50);
+        setContentView(statusView);
+        final GameView gameView = new GameView(this);
+
+        setContentView(gameView);
 
         final Handler handler = new Handler() {
             public void handleMessage(Message msg) {
@@ -86,16 +89,29 @@ public class MainActivity extends ActionBarActivity {
                 float x = event.getX();
                 float y = event.getY();
                 switch (event.getAction()) {
-                    //控制挡板左移
                     case MotionEvent.ACTION_DOWN:
                         preX = x;
                         preY = y;
+                       flame.onPress();
                         break;
                     case MotionEvent.ACTION_MOVE:
+                         float changeX = x - preX;
+                        if(flame.getPositionTopX() + changeX < flame.getPositionBottomX() + flame.getFlameHeight() && flame.getPositionTopX() + changeX > flame.getPositionBottomX() - flame.getFlameHeight()) {
+                            flame.setPositionTop(flame.getPositionTopX() + changeX,(float)(flame.getPositionBottomY() + Math.sqrt(flame.getFlameHeight() * flame.getFlameHeight() - (flame.getPositionTopX() - flame.getPositionBottomX()) * (flame.getPositionTopX() - flame.getPositionBottomX()))));
+                        }
+                        else {
+                            if(changeX > 0) {
+                                flame.setPositionTop(flame.getPositionBottomX() + flame.getFlameHeight(), flame.getPositionBottomY());
+                            }
+                            else flame.setPositionTop(flame.getPositionBottomX() - flame.getFlameHeight(), flame.getPositionBottomY());
+                        }
 
-                        racketX += x - preX;
-                        preX = x;
                         break;
+                    case MotionEvent.ACTION_UP:
+                        degress = 0;
+                        flame.onUnPress();
+                        break;
+
                 }
                 gameView.invalidate();
                 return true;
@@ -106,21 +122,14 @@ public class MainActivity extends ActionBarActivity {
 
         timer.schedule(new TimerTask() {
             public void run() {
-                //如果小球碰到左边边框
-                if (ballX <= 0 || ballX >= tableWidth - BALL_SIZE) {
-                    xSpeed = -xSpeed;
+                for(int i = 0; i < ropes.size(); i++) {
+                    Rope rope = ropes.get(i);
+                    rope.setPostionTop(rope.getPositionTopX(), rope.getPositionTopY() + flame.getSpeed());
+                    if(rope.getPositionTopY() > tableHeight) {
+                        ropes.remove(i);
+                    }
                 }
-                if (ballY >= racketY - BALL_SIZE && (ballX < racketX || ballX > racketX + RACKET_WIDTH)) {
-                    timer.cancel();
-                    isLose = true;
-                }
-                //如果小球位于球拍之内，且到达球拍位置，小球反弹
-                else if (ballY <= 0 || (ballY >= racketY - BALL_SIZE && ballX > racketX && ballX <= racketX + RACKET_WIDTH)) {
-                    ySpeed = -ySpeed;
-                }
-                // 小球坐标增加
-                ballY += ySpeed;
-                ballX += xSpeed;
+
                 //发送消息，通知系统重绘组件
                 handler.sendEmptyMessage(0x123);
             }
@@ -135,13 +144,34 @@ public class MainActivity extends ActionBarActivity {
 
     class GameView extends View {
         Paint paint = new Paint();
+
         public GameView(Context context) {
             super(context);
             setFocusable(true);
+
+
+
         }
+
         //重写View的onDraw方法，实现绘画
         public void onDraw(Canvas canvas) {
+
+
             paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.RED);
+            canvas.drawRect(0, 0, gas.getCurrentGas(), 30, paint);
+           // canvas.drawText("高度："+altitude.getAltitude(), 0, 10,100,30,paint);
+
+
+            while(ropes.size() <= ropeMaxNumber) {
+               Rope rope = new Rope();
+                rope.setHeight(flame.getFlameHeight());
+                rope.setPostionTop(new Random().nextFloat() * tableWidth,0 - new Random().nextFloat() * tableHeight);
+
+                ropes.add(rope);
+            }
+
+            paint.setStyle(Paint.Style.STROKE);
             //设置去锯齿
             paint.setAntiAlias(true);
             //如果游戏已经结束
@@ -153,13 +183,45 @@ public class MainActivity extends ActionBarActivity {
             }
             //如果游戏还未结束
             else {
-                //设置颜色，并绘制小球
-                paint.setColor(Color.rgb(240, 240, 80));
-                canvas.drawCircle(ballX, ballY, BALL_SIZE, paint);
+                //
+                Bitmap cacheBitmap = Bitmap.createBitmap((int)tableWidth, (int)tableHeight, Bitmap.Config.ARGB_8888);
+                Canvas cacheCanvas = new Canvas();
+                cacheCanvas.setBitmap(cacheBitmap);
+
+                paint.setColor(Color.BLACK);
+
+                for(int i = 0; i < ropes.size(); i++) {
+                    Rope rope = ropes.get(i);
+                    System.out.println("Flame.flamehight"+flame.getFlameHeight()+"rope.length:"+ rope.getLength());
+                    paint.setStrokeWidth(rope.getSize());
+                    canvas.drawCircle(rope.getPositionTopX(), rope.getPositionTopY(), 2f, paint);
+                    canvas.drawCircle(rope.getPositionTopX(), rope.getPositionTopY() + rope.getLength(), 2f,paint);
+                    canvas.drawLine(rope.getPositionTopX(),rope.getPositionTopY(),rope.getPositionTopX(),rope.getPositionTopY() + rope.getLength(), paint);
+                }
 
                 paint.setColor(Color.rgb(80, 80, 200));
-                canvas.drawRect(racketX, racketY, racketX + RACKET_WIDTH, racketY + RACKET_HEIGHT, paint);
+                paint.setStrokeWidth(1);
+                cacheCanvas.drawRect(flame.getPositionTopX(), flame.getPositionTopY(), flame.getPositionBottomX(), flame.getPositionBottomY(), paint);
+                canvas.drawRect(flame.getPositionTopX(), flame.getPositionTopY(), flame.getPositionBottomX(), flame.getPositionBottomY(), paint);
+
             }
+        }
+    }
+
+
+    class StatusView extends View {
+        Paint paint;
+        StatusView(Context context) {
+            super(context);
+
+        }
+
+        public void onDraw(Canvas canvas){
+            paint = new Paint();
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.RED);
+            canvas.drawRect(0, 0, gas.getCurrentGas(), 30, paint);
+            canvas.drawText("高度："+altitude.getAltitude(),200, 30,200,30,paint);
         }
     }
 }
